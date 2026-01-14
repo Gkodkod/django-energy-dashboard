@@ -4,7 +4,7 @@ A comprehensive energy visualization dashboard built with **Django** and **Chart
 
 ## Features
 
--   **Real-Time US Demand:** Visualizes the electricity demand (Megawatthours) for the Lower 48 states over the last 24 hours.
+-   **Real-Time US Demand:** Visualizes the electricity demand (MWh) for the Lower 48 states over the last 24 hours.
 -   **State Analysis:** Interactive tool to explore historical annual electricity generation trends by fuel type for any US state.
 -   **Net Load & Duck Curve Analysis:** Advanced visualization showing the impact of solar and wind on grid demand. Track the "Duck Curve" and ramp rates across major regions like CAISO, ERCOT, and PJM.
 -   **Congestion Proxy:** A unique tool that proxies "Grid Congestion" by comparing real-time Regional Demand against the Annual Nameplate Capacity of its representative state (e.g., ERCOT vs. Texas). Features a Demand/Capacity chart and an hourly utilization heatmap.
@@ -13,7 +13,7 @@ A comprehensive energy visualization dashboard built with **Django** and **Chart
 
 ## Technology Stack
 
--   **Backend:** Python 3, Django 5.x
+-   **Backend:** Python 3, Django 6.0.1
 -   **Data Source:** U.S. EIA Open Data API (v2)
 -   **Frontend:** Django Templates, HTML5, CSS3, Chart.js
 -   **Utilities:** `requests` for API fetching, `python-dotenv` for configuration.
