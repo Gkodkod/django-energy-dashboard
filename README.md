@@ -5,6 +5,7 @@ A comprehensive energy visualization dashboard built with **Django** and **Chart
 ## Features
 
 -   **Real-Time US Demand:** Visualizes the electricity demand (Megawatthours) for the Lower 48 states over the last 24 hours.
+-   **State Analysis:** Interactive tool to explore historical annual electricity generation trends by fuel type for any US state.
 -   **Dark Mode UI:** A premium, responsive dark-themed interface built with custom CSS.
 -   **Secure Configuration:** API keys are managed safely via environment variables.
 
@@ -19,7 +20,7 @@ A comprehensive energy visualization dashboard built with **Django** and **Chart
 
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/YOUR_USERNAME/django-energy-dashboard.git
+    git clone https://github.com/Gkodkod/django-energy-dashboard.git
     cd django-energy-dashboard
     ```
 

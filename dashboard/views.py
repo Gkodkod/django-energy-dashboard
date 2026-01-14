@@ -29,18 +29,17 @@ def get_state_generation(api_key, state_code):
     }
     
     try:
-        response = requests.get(base_url, params=params)
-        response.raise_for_status()
-        payload = response.json()
-        
-        if 'response' in payload and 'data' in payload['response']:
-            raw_data = payload['response']['data']
-            processed = {} 
+
+            
+            processed = {}  
             
             for entry in raw_data:
                 year = entry.get('period')
                 fuel_code = entry.get('fueltypeid')
-                val = entry.get('generation', 0)
+                try:
+                    val = float(entry.get('generation', 0) or 0)
+                except (ValueError, TypeError):
+                    val = 0
                 
                 if year not in processed:
                     processed[year] = {k: 0 for k in fuel_types.values()}
