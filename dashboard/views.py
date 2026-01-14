@@ -142,3 +142,129 @@ def state_analysis(request):
     }
     return render(request, 'dashboard/state_analysis.html', context)
 
+def get_net_load_data(api_key, region_code):
+    # Endpoints
+    url_demand = "https://api.eia.gov/v2/electricity/rto/region-data/data"
+    url_fuel = "https://api.eia.gov/v2/electricity/rto/fuel-type-data/data"
+    
+    if not api_key:
+        return None
+
+    # 1. Fetch Gross Demand
+    params_demand = {
+        'api_key': api_key,
+        'frequency': 'local-hourly',
+        'data[0]': 'value',
+        'facets[respondent][]': region_code,
+        'sort[0][column]': 'period',
+        'sort[0][direction]': 'desc',
+        'length': 48 # Last 48 hours for a good curve
+    }
+    
+    try:
+        r_demand = requests.get(url_demand, params=params_demand)
+        r_demand.raise_for_status()
+        demand_data = r_demand.json().get('response', {}).get('data', [])
+    except Exception as e:
+        print(f"Net Load Demand Error: {e}")
+        return None
+
+    # 2. Fetch Renewables (Wind + Solar)
+    params_fuel = {
+        'api_key': api_key,
+        'frequency': 'local-hourly',
+        'data[0]': 'value',
+        'facets[respondent][]': region_code,
+        'facets[fueltype][]': ['WND', 'SUN'],
+        'sort[0][column]': 'period',
+        'sort[0][direction]': 'desc',
+        'length': 100 # Fetch more to ensure we cover the same time range for both fuels
+    }
+    
+    try:
+        r_fuel = requests.get(url_fuel, params=params_fuel)
+        r_fuel.raise_for_status()
+        fuel_data = r_fuel.json().get('response', {}).get('data', [])
+    except Exception as e:
+        print(f"Net Load Fuel Error: {e}")
+        return None
+
+    # 3. Process & Align Data
+    # Map: 'YYYY-MM-DDTHH' -> {'demand': X, 'wind': Y, 'solar': Z}
+    combined = {}
+    
+    # Process Demand
+    for d in demand_data:
+        p = d.get('period')
+        if p not in combined: combined[p] = {'demand': 0, 'solar': 0, 'wind': 0}
+        combined[p]['demand'] = float(d.get('value', 0) or 0)
+        combined[p]['ts'] = d.get('period') # Keep timestamp for sorting
+
+    # Process Renewables
+    for f in fuel_data:
+        p = f.get('period')
+        ft = f.get('fueltype')
+        val = float(f.get('value', 0) or 0)
+        
+        if p in combined:
+            if ft == 'SUN': combined[p]['solar'] += val
+            if ft == 'WND': combined[p]['wind'] += val
+
+    # Validate we have complete data points (demand + at least one fuel potentially)
+    # Sort by time ascending
+    sorted_periods = sorted(combined.keys())
+    
+    labels = []
+    dataset_demand = []
+    dataset_net = []
+    dataset_solar = []
+    dataset_wind = []
+    
+    for p in sorted_periods:
+        data = combined[p]
+        # Clean label (remove date if redundant, but keep for now)
+        label = p.split('T')[1] + ":00" if 'T' in p else p
+        
+        demand = data['demand']
+        solar = data['solar']
+        wind = data['wind']
+        net_load = demand - (solar + wind)
+        
+        labels.append(label)
+        dataset_demand.append(demand)
+        dataset_net.append(net_load)
+        dataset_solar.append(solar)
+        dataset_wind.append(wind)
+
+    return {
+        'labels': labels,
+        'gross_demand': dataset_demand,
+        'net_load': dataset_net,
+        'solar': dataset_solar,
+        'wind': dataset_wind
+    }
+
+def net_load_analysis(request):
+    api_key = os.getenv('EIA_API_KEY')
+    selected_region = request.GET.get('region', 'CISO') # Default to CAISO (California)
+    
+    # Region Map
+    regions = {
+        'CISO': 'CAISO (California)',
+        'ERCO': 'ERCOT (Texas)',
+        'PJM': 'PJM (East/Mid-Atlantic)',
+        'MISO': 'MISO (Midwest)',
+        'NYIS': 'NYISO (New York)',
+        'ISNE': 'ISO-NE (New England)'
+    }
+    
+    chart_data = get_net_load_data(api_key, selected_region)
+    
+    context = {
+        'chart_data': chart_data,
+        'selected_region': selected_region,
+        'selected_region_name': regions.get(selected_region, selected_region),
+        'all_regions': regions,
+    }
+    return render(request, 'dashboard/net_load.html', context)
+

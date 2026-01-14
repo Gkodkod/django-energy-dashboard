@@ -1,0 +1,173 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Net Load Analysis | Energy Monitor</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'dashboard/style.css' %}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <a href="{% url 'index' %}"
+                    style="color: var(--accent); text-decoration: none; font-weight: 600;">&larr; Back to Dashboard</a>
+                <h1>Net Load Analysis</h1>
+                <div style="width: 100px;"></div>
+            </div>
+            <p>Analyzing the Impact of Renewables on Grid Demand</p>
+        </header>
+
+        <div class="dashboard-grid">
+            <div class="card">
+                <div
+                    style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 15px; margin-bottom: 20px;">
+                    <h2 style="margin: 0; border: none; padding: 0;">Region: {{ selected_region_name }}</h2>
+                    <form method="get" action="" id="regionForm">
+                        <select name="region" onchange="document.getElementById('regionForm').submit()"
+                            style="padding: 8px; border-radius: 6px; background: #0d1117; color: white; border: 1px solid #30363d;">
+                            {% for code, name in all_regions.items %}
+                            <option value="{{ code }}" {% if code == selected_region %}selected{% endif %}>{{ name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </form>
+                </div>
+
+                <div style="margin-bottom: 30px; line-height: 1.6; color: #c9d1d9;">
+                    <h3 style="color: var(--accent); margin-bottom: 10px;">What is Net Load and the "Duck Curve"?</h3>
+                    <p style="margin-bottom: 15px;">
+                        <strong>Net Load</strong> represents the total electricity demand minus the generation from
+                        variable renewable sources (primarily Solar and Wind).
+                        It is the portion of demand that "dispatchable" power plants (like natural gas, hydro, or
+                        batteries) must ramp up to meet.
+                    </p>
+                    <p style="margin-bottom: 15px;">
+                        The <strong>"Duck Curve"</strong> is a phenomenon (famously seen in CAISO) where massive solar
+                        generation during the day pushes net load down, creating a belly.
+                        As the sun sets in the evening, net load ramps up steeply while solar disappears. This steep
+                        ramp puts significant stress on grid operators to bring other resources online quickly.
+                    </p>
+                    <ul style="margin-left: 20px; list-style-type: disc; color: var(--text-secondary);">
+                        <li><strong>Gross Demand (Blue Line):</strong> Total power consumption by consumers.</li>
+                        <li><strong>Net Load (Purple Line):</strong> Gross Demand minus Wind and Solar. Observe the dip
+                            during the day!</li>
+                        <li><strong>Solar/Wind (Area):</strong> The renewable generation reducing the load on the grid.
+                        </li>
+                    </ul>
+                </div>
+
+                {% if chart_data %}
+                <div class="chart-container">
+                    <canvas id="netLoadChart"></canvas>
+                </div>
+                {% else %}
+                <p style="text-align: center; color: var(--text-secondary);">No data available for {{
+                    selected_region_name }} or API error.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <footer>
+            <p>Data Source: U.S. Energy Information Administration (EIA) API v2</p>
+        </footer>
+    </div>
+
+    <script>
+        {% if chart_data %}
+        const ctx = document.getElementById( 'netLoadChart' ).getContext( '2d' );
+        const data = {{ chart_data| safe }};
+
+        new Chart( ctx, {
+            type: 'line',
+            data: {
+                labels: data.labels,
+                datasets: [
+                    {
+                        label: 'Gross Demand',
+                        data: data.gross_demand,
+                        borderColor: '#36a2eb', // Blue
+                        backgroundColor: '#36a2eb',
+                        borderWidth: 2,
+                        tension: 0.4,
+                        fill: false,
+                        pointRadius: 0
+                    },
+                    {
+                        label: 'Net Load',
+                        data: data.net_load,
+                        borderColor: '#9966ff', // Purple
+                        backgroundColor: 'rgba(153, 102, 255, 0.1)',
+                        borderWidth: 3,
+                        tension: 0.4,
+                        fill: true,
+                        pointRadius: 0
+                    },
+                    {
+                        label: 'Solar Generation',
+                        data: data.solar,
+                        borderColor: '#ffcd56', // Yellow
+                        backgroundColor: 'rgba(255, 205, 86, 0.2)',
+                        borderWidth: 1,
+                        tension: 0.4,
+                        fill: true,
+                        pointRadius: 0
+                    },
+                    {
+                        label: 'Wind Generation',
+                        data: data.wind,
+                        borderColor: '#4bc0c0', // Teal
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        borderWidth: 1,
+                        tension: 0.4,
+                        fill: true,
+                        pointRadius: 0
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                plugins: {
+                    legend: { display: true, labels: { color: '#f0f6fc' } },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        callbacks: {
+                            label: function ( context ) {
+                                let label = context.dataset.label || '';
+                                if ( label ) {
+                                    label += ': ';
+                                }
+                                if ( context.parsed.y !== null ) {
+                                    label += Math.round( context.parsed.y ).toLocaleString() + ' MWh';
+                                }
+                                return label;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: { grid: { color: '#30363d' }, ticks: { color: '#8b949e' } },
+                    y: {
+                        grid: { color: '#30363d' },
+                        ticks: { color: '#8b949e' },
+                        title: { display: true, text: 'Megawatthours (MWh)', color: '#8b949e' }
+                    }
+                }
+            }
+        } );
+        {% endif %}
+    </script>
+</body>
+
+</html>
