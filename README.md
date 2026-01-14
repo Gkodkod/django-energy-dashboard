@@ -7,6 +7,7 @@ A comprehensive energy visualization dashboard built with **Django** and **Chart
 -   **Real-Time US Demand:** Visualizes the electricity demand (Megawatthours) for the Lower 48 states over the last 24 hours.
 -   **State Analysis:** Interactive tool to explore historical annual electricity generation trends by fuel type for any US state.
 -   **Net Load & Duck Curve Analysis:** Advanced visualization showing the impact of solar and wind on grid demand. Track the "Duck Curve" and ramp rates across major regions like CAISO, ERCOT, and PJM.
+-   **Congestion Proxy:** A unique tool that proxies "Grid Congestion" by comparing real-time Regional Demand against the Annual Nameplate Capacity of its representative state (e.g., ERCOT vs. Texas). Features a Demand/Capacity chart and an hourly utilization heatmap.
 -   **Dark Mode UI:** A premium, responsive dark-themed interface built with custom CSS.
 -   **Secure Configuration:** API keys are managed safely via environment variables.
 

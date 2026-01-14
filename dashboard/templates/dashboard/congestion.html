@@ -1,0 +1,252 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Congestion Proxy | Energy Monitor</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'dashboard/style.css' %}">
+    <link rel="shortcut icon" type="image/png" href="{% static 'dashboard/favicon.png' %}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .heatmap-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .heatmap-cell {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 10px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            transition: transform 0.2s;
+        }
+
+        .heatmap-cell:hover {
+            transform: scale(1.05);
+            border-color: var(--accent);
+        }
+
+        .heatmap-cell.alert {
+            background-color: rgba(255, 99, 132, 0.2);
+            border-color: #ff6384;
+        }
+
+        .heatmap-value {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #f0f6fc;
+        }
+
+        .heatmap-label {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-bottom: 5px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-right: 20px;
+        }
+
+        .legend-color {
+            width: 15px;
+            height: 15px;
+            border-radius: 3px;
+            margin-right: 8px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <a href="{% url 'index' %}"
+                    style="color: var(--accent); text-decoration: none; font-weight: 600;">&larr; Back to Dashboard</a>
+                <h1>Congestion Proxy</h1>
+                <div style="width: 100px;"></div>
+            </div>
+            <p>Compare Real-Time Regional Demand vs. Total Available Generation Capacity (Nameplate)</p>
+        </header>
+
+        <div class="dashboard-grid">
+            <div class="card">
+                <div
+                    style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 15px; margin-bottom: 20px;">
+                    <h2 style="margin: 0; border: none; padding: 0;">Region: {{ selected_region_name }}</h2>
+                    <form method="get" action="" id="regionForm">
+                        <select name="region" onchange="document.getElementById('regionForm').submit()"
+                            style="padding: 8px; border-radius: 6px; background: #0d1117; color: white; border: 1px solid #30363d;">
+                            {% for code, name in all_regions.items %}
+                            <option value="{{ code }}" {% if code == selected_region %}selected{% endif %}>{{ name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </form>
+                </div>
+
+                {% if congestion_data %}
+
+                <div style="background: rgba(48, 54, 61, 0.4); padding: 15px; border-radius: 6px; margin-bottom: 25px;">
+                    <h3 style="margin-top: 0; font-size: 1rem; color: #f0f6fc;">What is this showing?</h3>
+                    <p style="font-size: 0.9rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 0;">
+                        This page acts as a <strong>"Congestion Proxy"</strong> by comparing the real-time electricity
+                        demand of a region (e.g., ERCOT) against the total installed generation capacity of its primary
+                        state (e.g., Texas).
+                        <br><br>
+                        <strong>Utilization %</strong> = (Current Demand / Total Nameplate Capacity) * 100.
+                        <br>
+                        High utilization (>85%) suggests the grid is operating closer to its maximum limit, which can
+                        correlate with higher prices or congestion risks.
+                    </p>
+                </div>
+
+                <div style="margin-bottom: 25px;">
+                    <div style="display: flex; gap: 40px; margin-bottom: 20px; align-items: flex-end;">
+                        <div>
+                            <span
+                                style="display: block; font-size: 0.9rem; color: var(--text-secondary);">Representative
+                                State</span>
+                            <span style="font-size: 1.4rem; font-weight: 700;">{{ congestion_data.state_name }}</span>
+                        </div>
+                        <div>
+                            <span style="display: block; font-size: 0.9rem; color: var(--text-secondary);">Total
+                                Nameplate Capacity</span>
+                            <span style="font-size: 1.4rem; font-weight: 700; color: var(--accent);">
+                                {% load humanize %}
+                                {{ congestion_data.capacity_mw|intcomma }} MW
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- NEW CHART -->
+                <div class="chart-container" style="height: 350px; margin-bottom: 30px;">
+                    <canvas id="congestionChart"></canvas>
+                </div>
+
+                <h3
+                    style="font-size: 1.1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 15px;">
+                    Hourly Utilization Heatmap</h3>
+
+                <div style="display: flex; align-items: center; margin-bottom: 15px;">
+                    <div class="legend-item">
+                        <div class="legend-color"
+                            style="background: rgba(255, 99, 132, 0.2); border: 1px solid #ff6384;"></div>
+                        <span>> 85% Utilization (High Load)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #161b22; border: 1px solid #30363d;"></div>
+                        <span>Normal Operation</span>
+                    </div>
+                </div>
+
+                <div class="heatmap-grid">
+                    {% for hour in congestion_data.hourly_data %}
+                    <div class="heatmap-cell {% if hour.is_high %}alert{% endif %}"
+                        title="Demand: {{ hour.demand|intcomma }} MW | Cap: {{ hour.capacity|intcomma }} MW">
+                        <div class="heatmap-label">{{ hour.day }} {{ hour.hour }}</div>
+                        <div class="heatmap-value" style="{% if hour.is_high %}color: #ff6384;{% endif %}">
+                            {{ hour.utilization }}%
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <script>
+                    const ctx = document.getElementById( 'congestionChart' ).getContext( '2d' );
+
+                    // Prepare Data
+                    const labels = [{% for h in congestion_data.hourly_data %}"{{ h.hour }}", {% endfor %}];
+                    const demandData = [{% for h in congestion_data.hourly_data %}{{ h.demand }}, {% endfor %}];
+                    const capacityValue = {{ congestion_data.capacity_mw }};
+                    const capacityData = new Array( labels.length ).fill( capacityValue );
+
+                    const chart = new Chart( ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [
+                                {
+                                    label: 'Hourly Demand (MW)',
+                                    data: demandData,
+                                    borderColor: '#4bc0c0',
+                                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                                    fill: true,
+                                    tension: 0.4,
+                                    borderWidth: 2,
+                                    pointRadius: 2
+                                },
+                                {
+                                    label: 'Total Capacity Limit (MW)',
+                                    data: capacityData,
+                                    borderColor: '#ff6384',
+                                    borderWidth: 2,
+                                    borderDash: [5, 5],
+                                    pointRadius: 0,
+                                    fill: false
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            interaction: {
+                                mode: 'index',
+                                intersect: false,
+                            },
+                            plugins: {
+                                legend: {
+                                    labels: { color: '#f0f6fc' }
+                                },
+                                tooltip: {
+                                    backgroundColor: '#161b22',
+                                    titleColor: '#f0f6fc',
+                                    bodyColor: '#8b949e',
+                                    borderColor: '#30363d',
+                                    borderWidth: 1
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    grid: { color: '#30363d' },
+                                    ticks: { color: '#8b949e' }
+                                },
+                                y: {
+                                    grid: { color: '#30363d' },
+                                    ticks: { color: '#8b949e' },
+                                    beginAtZero: true
+                                }
+                            }
+                        }
+                    } );
+                </script>
+
+                {% else %}
+                <p style="text-align: center; color: var(--text-secondary); padding: 40px;">
+                    No data available for this region.<br>
+                    <small>Please check API connectivity or try another region.</small>
+                </p>
+                {% endif %}
+            </div>
+        </div>
+
+        <footer>
+            <p>Data Source: U.S. Energy Information Administration (EIA) API v2</p>
+        </footer>
+    </div>
+</body>
+
+</html>
