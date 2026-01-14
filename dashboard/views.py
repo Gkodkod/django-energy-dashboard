@@ -31,6 +31,13 @@ def get_state_generation(api_key, state_code):
     try:
 
             
+        response = requests.get(base_url, params=params)
+        response.raise_for_status()
+        payload = response.json()
+        
+        if 'response' in payload and 'data' in payload['response']:
+            raw_data = payload['response']['data']
+            
             processed = {}  
             
             for entry in raw_data:
