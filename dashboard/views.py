@@ -3,6 +3,74 @@ import requests
 from django.shortcuts import render
 from datetime import datetime
 
+def get_state_generation(api_key, state_code):
+    base_url = "https://api.eia.gov/v2/electricity/electric-power-operational-data/data"
+    
+    fuel_types = {
+        'WND': 'Wind',
+        'SUN': 'Solar',
+        'NG': 'Natural Gas', 
+        'COW': 'Coal',
+        'NUC': 'Nuclear'
+    }
+    
+    if not api_key:
+        return None
+
+    params = {
+        'api_key': api_key,
+        'frequency': 'annual',
+        'data[0]': 'generation',
+        'facets[location][]': state_code,
+        'facets[sectorid][]': '99', 
+        'facets[fueltypeid][]': list(fuel_types.keys()), 
+        'sort[0][column]': 'period',
+        'sort[0][direction]': 'asc',
+    }
+    
+    try:
+        response = requests.get(base_url, params=params)
+        response.raise_for_status()
+        payload = response.json()
+        
+        if 'response' in payload and 'data' in payload['response']:
+            raw_data = payload['response']['data']
+            processed = {} 
+            
+            for entry in raw_data:
+                year = entry.get('period')
+                fuel_code = entry.get('fueltypeid')
+                val = entry.get('generation', 0)
+                
+                if year not in processed:
+                    processed[year] = {k: 0 for k in fuel_types.values()}
+                
+                fuel_label = fuel_types.get(fuel_code)
+                if fuel_label:
+                    processed[year][fuel_label] += val 
+            
+            sorted_years = sorted(processed.keys())
+            chart_data = {'years': sorted_years, 'datasets': []}
+            
+            colors = {
+                'Wind': '#4bc0c0', 'Solar': '#ffcd56', 
+                'Natural Gas': '#ff6384', 'Coal': '#36a2eb', 'Nuclear': '#9966ff'
+            }
+            
+            for fuel in fuel_types.values():
+                data_series = [processed[y].get(fuel, 0) for y in sorted_years]
+                chart_data['datasets'].append({
+                    'label': fuel,
+                    'data': data_series,
+                    'borderColor': colors.get(fuel, '#ccc'),
+                    'backgroundColor': colors.get(fuel, '#ccc')
+                })
+            return chart_data
+    except Exception as e:
+        print(f"State Data Error: {e}")
+        return None
+    return None
+
 def index(request):
     api_key = os.getenv('EIA_API_KEY')
     
@@ -47,4 +115,24 @@ def index(request):
     }
 
     return render(request, 'dashboard/index.html', context)
+
+def state_analysis(request):
+    api_key = os.getenv('EIA_API_KEY')
+    selected_state = request.GET.get('state', 'TX')
+    state_chart_data = get_state_generation(api_key, selected_state)
+    
+    all_states = [
+        'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA', 
+        'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 
+        'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 
+        'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 
+        'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY'
+    ]
+
+    context = {
+        'state_data': state_chart_data,
+        'selected_state': selected_state,
+        'all_states': all_states,
+    }
+    return render(request, 'dashboard/state_analysis.html', context)
 

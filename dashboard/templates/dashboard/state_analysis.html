@@ -1,0 +1,96 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>State Generation Trends | Energy Monitor</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'dashboard/style.css' %}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <a href="{% url 'index' %}"
+                    style="color: var(--accent); text-decoration: none; font-weight: 600;">&larr; Back to Dashboard</a>
+                <h1>State Analysis</h1>
+                <div style="width: 100px;"></div>
+            </div>
+            <p>Annual Electricity Generation Trends by Fuel Type</p>
+        </header>
+
+        <div class="dashboard-grid">
+            <div class="card">
+                <div
+                    style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 15px; margin-bottom: 20px;">
+                    <h2 style="margin: 0; border: none; padding: 0;">Generation History: {{ selected_state }}</h2>
+                    <form method="get" action="" id="stateForm">
+                        <select name="state" onchange="document.getElementById('stateForm').submit()"
+                            style="padding: 8px; border-radius: 6px; background: #0d1117; color: white; border: 1px solid #30363d;">
+                            {% for state in all_states %}
+                            <option value="{{ state }}" {% if state == selected_state %}selected{% endif %}>{{ state }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </form>
+                </div>
+
+                {% if state_data %}
+                <div class="chart-container">
+                    <canvas id="stateChart"></canvas>
+                </div>
+                {% else %}
+                <p style="text-align: center; color: var(--text-secondary);">No data available for {{ selected_state }}
+                    or API error.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <footer>
+            <p>Data Source: U.S. Energy Information Administration (EIA) API v2</p>
+        </footer>
+    </div>
+
+    <script>
+        {% if state_data %}
+        const ctxState = document.getElementById( 'stateChart' ).getContext( '2d' );
+        const stateData = {{ state_data| safe }};
+
+        new Chart( ctxState, {
+            type: 'line',
+            data: {
+                labels: stateData.years,
+                datasets: stateData.datasets.map( ds => ( {
+                    ...ds,
+                    borderWidth: 2,
+                    tension: 0.3,
+                    fill: false,
+                    pointRadius: 3
+                } ) )
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: true, labels: { color: '#f0f6fc' } },
+                    tooltip: { mode: 'index', intersect: false }
+                },
+                scales: {
+                    x: { grid: { color: '#30363d' }, ticks: { color: '#8b949e' } },
+                    y: {
+                        grid: { color: '#30363d' },
+                        ticks: { color: '#8b949e' },
+                        title: { display: true, text: 'Generation (MWh)', color: '#8b949e' }
+                    }
+                }
+            }
+        } );
+        {% endif %}
+    </script>
+</body>
+
+</html>

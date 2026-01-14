@@ -16,6 +16,10 @@
         <header>
             <h1>US Energy Monitor</h1>
             <p>Real-time Electricity Demand (US Lower 48)</p>
+            <div style="margin-top: 10px;">
+                <a href="{% url 'state_analysis' %}"
+                    style="color: var(--accent); text-decoration: none; font-size: 0.9rem;">View State Trends &rarr;</a>
+            </div>
         </header>
 
         {% if error %}
