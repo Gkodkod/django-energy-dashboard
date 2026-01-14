@@ -33,7 +33,7 @@
                         <select name="region" onchange="document.getElementById('regionForm').submit()"
                             style="padding: 8px; border-radius: 6px; background: #0d1117; color: white; border: 1px solid #30363d;">
                             {% for code, name in all_regions.items %}
-                            <option value="{{ code }}" {% if code==selected_region %}selected{% endif %}>{{ name }}
+                            <option value="{{ code }}" {% if code == selected_region %}selected{% endif %}>{{ name }}
                             </option>
                             {% endfor %}
                         </select>

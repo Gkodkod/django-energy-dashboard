@@ -33,7 +33,7 @@
                         <select name="state" onchange="document.getElementById('stateForm').submit()"
                             style="padding: 8px; border-radius: 6px; background: #0d1117; color: white; border: 1px solid #30363d;">
                             {% for state in all_states %}
-                            <option value="{{ state }}" {% if state==selected_state %}selected{% endif %}>{{ state }}
+                            <option value="{{ state }}" {% if state == selected_state %}selected{% endif %}>{{ state }}
                             </option>
                             {% endfor %}
                         </select>
