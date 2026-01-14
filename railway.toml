@@ -1,0 +1,2 @@
+[deploy]
+startCommand = "python manage.py migrate && gunicorn energy_project.wsgi:application"
