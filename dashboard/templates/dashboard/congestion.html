@@ -1,4 +1,5 @@
 {% load static %}
+{% load humanize %}
 <!DOCTYPE html>
 <html lang="en">
 
@@ -11,60 +12,73 @@
     <link rel="shortcut icon" type="image/png" href="{% static 'dashboard/favicon.png' %}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        .heatmap-grid {
+        /* CSS Grid Heatmap */
+        .heatmap-container {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
-            gap: 10px;
+            grid-template-columns: repeat(24, 1fr);
+            gap: 2px;
             margin-top: 20px;
+            background: #0d1117;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #30363d;
         }
 
         .heatmap-cell {
+            aspect-ratio: 1;
+            border-radius: 2px;
+            cursor: pointer;
+            transition: transform 0.1s ease, opacity 0.1s ease;
+        }
+
+        .heatmap-cell:hover {
+            transform: scale(1.1);
+            z-index: 10;
+            border: 1px solid white;
+        }
+
+        #heatmap-tooltip {
+            position: fixed;
             background: #161b22;
             border: 1px solid #30363d;
             border-radius: 6px;
             padding: 10px;
-            text-align: center;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            transition: transform 0.2s;
-        }
-
-        .heatmap-cell:hover {
-            transform: scale(1.05);
-            border-color: var(--accent);
-        }
-
-        .heatmap-cell.alert {
-            background-color: rgba(255, 99, 132, 0.2);
-            border-color: #ff6384;
-        }
-
-        .heatmap-value {
-            font-size: 1.1rem;
-            font-weight: 700;
             color: #f0f6fc;
+            font-size: 0.85rem;
+            pointer-events: none;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+            display: none;
+            z-index: 1000;
+            min-width: 180px;
+        }
+
+        #heatmap-tooltip strong {
+            color: #58a6ff;
+            display: block;
+            margin-bottom: 4px;
+            font-size: 0.9rem;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 2px;
+        }
+
+        .stat-label { color: #8b949e; }
+        .stat-value { font-weight: 600; }
+
+        .heatmap-labels {
+            display: grid;
+            grid-template-columns: repeat(24, 1fr);
+            margin-bottom: 5px;
+            padding: 0 10px;
         }
 
         .heatmap-label {
-            font-size: 0.8rem;
-            color: var(--text-secondary);
-            margin-bottom: 5px;
-        }
-
-        .legend-item {
-            display: flex;
-            align-items: center;
-            font-size: 0.9rem;
-            color: var(--text-secondary);
-            margin-right: 20px;
-        }
-
-        .legend-color {
-            width: 15px;
-            height: 15px;
-            border-radius: 3px;
-            margin-right: 8px;
+            text-align: center;
+            font-size: 0.7rem;
+            color: #8b949e;
         }
     </style>
 </head>
@@ -73,8 +87,7 @@
     <div class="container">
         <header>
             <div style="display: flex; justify-content: space-between; align-items: center;">
-                <a href="{% url 'index' %}"
-                    style="color: var(--accent); text-decoration: none; font-weight: 600;">&larr; Back to Dashboard</a>
+                <a href="{% url 'index' %}" style="color: var(--accent); text-decoration: none; font-weight: 600;">&larr; Back to Dashboard</a>
                 <h1>Congestion Proxy</h1>
                 <div style="width: 100px;"></div>
             </div>
@@ -83,22 +96,18 @@
 
         <div class="dashboard-grid">
             <div class="card">
-                <div
-                    style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 15px; margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 15px; margin-bottom: 20px;">
                     <h2 style="margin: 0; border: none; padding: 0;">Region: {{ selected_region_name }}</h2>
                     <form method="get" action="" id="regionForm">
-                        <select name="region" onchange="document.getElementById('regionForm').submit()"
-                            style="padding: 8px; border-radius: 6px; background: #0d1117; color: white; border: 1px solid #30363d;">
+                        <select name="region" onchange="document.getElementById('regionForm').submit()" style="padding: 8px; border-radius: 6px; background: #0d1117; color: white; border: 1px solid #30363d;">
                             {% for code, name in all_regions.items %}
-                            <option value="{{ code }}" {% if code == selected_region %}selected{% endif %}>{{ name }}
-                            </option>
+                            <option value="{{ code }}" {% if code == selected_region %}selected{% endif %}>{{ name }}</option>
                             {% endfor %}
                         </select>
                     </form>
                 </div>
 
                 {% if congestion_data %}
-
                 <div style="background: rgba(48, 54, 61, 0.4); padding: 15px; border-radius: 6px; margin-bottom: 25px;">
                     <h3 style="margin-top: 0; font-size: 1rem; color: #f0f6fc;">What is this showing?</h3>
                     <p style="font-size: 0.9rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 0;">
@@ -107,110 +116,85 @@
                         state (e.g., Texas).
                         <br><br>
                         <strong>Utilization %</strong> = (Current Demand / Total Nameplate Capacity) * 100.
-                        <br>
-                        High utilization (>85%) suggests the grid is operating closer to its maximum limit, which can
-                        correlate with higher prices or congestion risks.
                     </p>
                 </div>
 
                 <div style="margin-bottom: 25px;">
                     <div style="display: flex; gap: 40px; margin-bottom: 20px; align-items: flex-end;">
                         <div>
-                            <span
-                                style="display: block; font-size: 0.9rem; color: var(--text-secondary);">Representative
-                                State</span>
+                            <span style="display: block; font-size: 0.9rem; color: var(--text-secondary);">Representative State</span>
                             <span style="font-size: 1.4rem; font-weight: 700;">{{ congestion_data.state_name }}</span>
                         </div>
                         <div>
-                            <span style="display: block; font-size: 0.9rem; color: var(--text-secondary);">Total
-                                Nameplate Capacity</span>
-                            <span style="font-size: 1.4rem; font-weight: 700; color: var(--accent);">
-                                {% load humanize %}
-                                {{ congestion_data.capacity_mw|intcomma }} MW
-                            </span>
+                            <span style="display: block; font-size: 0.9rem; color: var(--text-secondary);">Total Nameplate Capacity</span>
+                            <span style="font-size: 1.4rem; font-weight: 700; color: var(--accent);">{{ congestion_data.capacity_mw|intcomma }} MW</span>
                         </div>
                     </div>
                 </div>
 
-                <!-- NEW CHART -->
                 <div class="chart-container" style="height: 350px; margin-bottom: 30px;">
                     <canvas id="congestionChart"></canvas>
                 </div>
 
-                <h3
-                    style="font-size: 1.1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 15px;">
-                    Hourly Utilization Heatmap</h3>
+                <h3 style="font-size: 1.1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 15px;">Hourly Utilization Heatmap</h3>
 
-                <div style="display: flex; align-items: center; margin-bottom: 15px;">
-                    <div class="legend-item">
-                        <div class="legend-color"
-                            style="background: rgba(255, 99, 132, 0.2); border: 1px solid #ff6384;"></div>
-                        <span>> 85% Utilization (High Load)</span>
+                <div>
+                    <p style="font-size: 0.8rem; color: #8b949e; text-align: center; margin-bottom: 5px;">Recent 48 Hours (Darker Red = Higher Load)</p>
+                    <div class="heatmap-labels">
+                        {% for i in "012345678901234567890123"|make_list %}<div class="heatmap-label">{{ forloop.counter0 }}</div>{% endfor %}
                     </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background: #161b22; border: 1px solid #30363d;"></div>
-                        <span>Normal Operation</span>
-                    </div>
-                </div>
-
-                <div class="heatmap-grid">
-                    {% for hour in congestion_data.hourly_data %}
-                    <div class="heatmap-cell {% if hour.is_high %}alert{% endif %}"
-                        title="Demand: {{ hour.demand|intcomma }} MW | Cap: {{ hour.capacity|intcomma }} MW">
-                        <div class="heatmap-label">{{ hour.day }} {{ hour.hour }}</div>
-                        <div class="heatmap-value" style="{% if hour.is_high %}color: #ff6384;{% endif %}">
-                            {{ hour.utilization }}%
+                    <div class="heatmap-container" id="heatmapGrid">
+                        {% for hour in congestion_data.hourly_data %}
+                        <div class="heatmap-cell" 
+                             data-date="{{ hour.day }}" 
+                             data-hour="{{ hour.hour }}"
+                             data-util="{{ hour.utilization }}" 
+                             data-demand="{{ hour.demand }}"
+                             data-capacity="{{ hour.capacity }}"
+                             style="background-color: {% if hour.utilization > 90 %}#d53e4f{% elif hour.utilization > 80 %}#fdae61{% elif hour.utilization > 60 %}#abdda4{% else %}#3288bd{% endif %}; opacity: 0.9;">
                         </div>
+                        {% endfor %}
                     </div>
-                    {% endfor %}
                 </div>
+
+                <div id="heatmap-tooltip"></div>
 
                 <script>
-                    const ctx = document.getElementById( 'congestionChart' ).getContext( '2d' );
-
-                    // Prepare Data
+                    const ctx = document.getElementById('congestionChart').getContext('2d');
                     const labels = [{% for h in congestion_data.hourly_data %}"{{ h.hour }}", {% endfor %}];
                     const demandData = [{% for h in congestion_data.hourly_data %}{{ h.demand }}, {% endfor %}];
                     const capacityValue = {{ congestion_data.capacity_mw }};
-                    const capacityData = new Array( labels.length ).fill( capacityValue );
+                    const capacityData = new Array(labels.length).fill(capacityValue);
 
-                    const chart = new Chart( ctx, {
+                    new Chart(ctx, {
                         type: 'line',
                         data: {
                             labels: labels,
-                            datasets: [
-                                {
-                                    label: 'Hourly Demand (MW)',
-                                    data: demandData,
-                                    borderColor: '#4bc0c0',
-                                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                                    fill: true,
-                                    tension: 0.4,
-                                    borderWidth: 2,
-                                    pointRadius: 2
-                                },
-                                {
-                                    label: 'Total Capacity Limit (MW)',
-                                    data: capacityData,
-                                    borderColor: '#ff6384',
-                                    borderWidth: 2,
-                                    borderDash: [5, 5],
-                                    pointRadius: 0,
-                                    fill: false
-                                }
-                            ]
+                            datasets: [{
+                                label: 'Hourly Demand (MW)',
+                                data: demandData,
+                                borderColor: '#4bc0c0',
+                                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                                fill: true,
+                                tension: 0.4,
+                                borderWidth: 2,
+                                pointRadius: 2
+                            }, {
+                                label: 'Total Capacity Limit (MW)',
+                                data: capacityData,
+                                borderColor: '#ff6384',
+                                borderWidth: 2,
+                                borderDash: [5, 5],
+                                pointRadius: 0,
+                                fill: false
+                            }]
                         },
                         options: {
                             responsive: true,
                             maintainAspectRatio: false,
-                            interaction: {
-                                mode: 'index',
-                                intersect: false,
-                            },
+                            interaction: { mode: 'index', intersect: false },
                             plugins: {
-                                legend: {
-                                    labels: { color: '#f0f6fc' }
-                                },
+                                legend: { labels: { color: '#f0f6fc' } },
                                 tooltip: {
                                     backgroundColor: '#161b22',
                                     titleColor: '#f0f6fc',
@@ -220,33 +204,42 @@
                                 }
                             },
                             scales: {
-                                x: {
-                                    grid: { color: '#30363d' },
-                                    ticks: { color: '#8b949e' }
-                                },
-                                y: {
-                                    grid: { color: '#30363d' },
-                                    ticks: { color: '#8b949e' },
-                                    beginAtZero: true
-                                }
+                                x: { grid: { color: '#30363d' }, ticks: { color: '#8b949e' } },
+                                y: { grid: { color: '#30363d' }, ticks: { color: '#8b949e' }, beginAtZero: true }
                             }
                         }
-                    } );
-                </script>
+                    });
 
+                    const tooltip = document.getElementById('heatmap-tooltip');
+                    const cells = document.querySelectorAll('.heatmap-cell');
+
+                    cells.forEach(cell => {
+                        cell.addEventListener('mouseenter', (e) => {
+                            const date = cell.getAttribute('data-date');
+                            const hour = cell.getAttribute('data-hour');
+                            const util = cell.getAttribute('data-util');
+                            const demand = parseInt(cell.getAttribute('data-demand')).toLocaleString();
+                            const cap = parseInt(cell.getAttribute('data-capacity')).toLocaleString();
+                            tooltip.innerHTML = `<strong>${date} ${hour}</strong><div class="stat-row"><span class="stat-label">Utilization</span> <span class="stat-value" style="color: ${util > 80 ? '#ff7b72' : '#79c0ff'}">${util}%</span></div><div class="stat-row"><span class="stat-label">Demand</span> <span class="stat-value">${demand} MW</span></div><div class="stat-row"><span class="stat-label">Capacity</span> <span class="stat-value">${cap} MW</span></div>`;
+                            tooltip.style.display = 'block';
+                        });
+
+                        cell.addEventListener('mousemove', (e) => {
+                            tooltip.style.left = e.pageX + 15 + 'px';
+                            tooltip.style.top = e.pageY + 15 + 'px';
+                        });
+
+                        cell.addEventListener('mouseleave', () => {
+                            tooltip.style.display = 'none';
+                        });
+                    });
+                </script>
                 {% else %}
-                <p style="text-align: center; color: var(--text-secondary); padding: 40px;">
-                    No data available for this region.<br>
-                    <small>Please check API connectivity or try another region.</small>
-                </p>
+                <p style="text-align: center; color: var(--text-secondary); padding: 40px;">No data available for this region.<br><small>Please check API connectivity or try another region.</small></p>
                 {% endif %}
             </div>
         </div>
-
-        <footer>
-            <p>Data Source: U.S. Energy Information Administration (EIA) API v2</p>
-        </footer>
+        <footer><p>Data Source: U.S. Energy Information Administration (EIA) API v2</p></footer>
     </div>
 </body>
-
 </html>
