@@ -8,6 +8,7 @@
     <title>State Generation Trends | Energy Monitor</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{% static 'dashboard/style.css' %}">
+    <link rel="shortcut icon" type="image/png" href="{% static 'dashboard/favicon.png' %}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
@@ -32,7 +33,7 @@
                         <select name="state" onchange="document.getElementById('stateForm').submit()"
                             style="padding: 8px; border-radius: 6px; background: #0d1117; color: white; border: 1px solid #30363d;">
                             {% for state in all_states %}
-                            <option value="{{ state }}" {% if state == selected_state %}selected{% endif %}>{{ state }}
+                            <option value="{{ state }}" {% if state==selected_state %}selected{% endif %}>{{ state }}
                             </option>
                             {% endfor %}
                         </select>
