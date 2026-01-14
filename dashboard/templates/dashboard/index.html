@@ -1,0 +1,110 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⚡ Energy Monitor</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'dashboard/style.css' %}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>US Energy Monitor</h1>
+            <p>Real-time Electricity Demand (US Lower 48)</p>
+        </header>
+
+        {% if error %}
+        <div class="error-message">
+            <strong>⚠️ Error:</strong> {{ error }}
+        </div>
+        {% endif %}
+
+        <div class="dashboard-grid">
+            <div class="card">
+                <h2>US48 Hourly Demand (Last 24h)</h2>
+                <div class="chart-container">
+                    <canvas id="demandChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>Data Source: U.S. Energy Information Administration (EIA) API v2</p>
+        </footer>
+    </div>
+
+    <script>
+        const ctx = document.getElementById( 'demandChart' ).getContext( '2d' );
+
+        // Data from Django
+        const labels = {{ labels| safe }};
+        const dataConfig = {{ data| safe }};
+
+        // Create Gradient
+        const gradient = ctx.createLinearGradient( 0, 0, 0, 400 );
+        gradient.addColorStop( 0, 'rgba(88, 166, 255, 0.5)' );
+        gradient.addColorStop( 1, 'rgba(88, 166, 255, 0.0)' );
+
+        const myChart = new Chart( ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Demand (Megawatthours)',
+                    data: dataConfig,
+                    borderColor: '#58a6ff',
+                    backgroundColor: gradient,
+                    borderWidth: 2,
+                    pointBackgroundColor: '#58a6ff',
+                    pointBorderColor: '#fff',
+                    pointHoverBackgroundColor: '#fff',
+                    pointHoverBorderColor: '#58a6ff',
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        labels: { color: '#f0f6fc' }
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        backgroundColor: '#161b22',
+                        titleColor: '#f0f6fc',
+                        bodyColor: '#8b949e',
+                        borderColor: '#30363d',
+                        borderWidth: 1
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { color: '#30363d' },
+                        ticks: { color: '#8b949e' }
+                    },
+                    y: {
+                        grid: { color: '#30363d' },
+                        ticks: { color: '#8b949e' },
+                        beginAtZero: false
+                    }
+                },
+                interaction: {
+                    mode: 'nearest',
+                    axis: 'x',
+                    intersect: false
+                }
+            }
+        } );
+    </script>
+</body>
+
+</html>
